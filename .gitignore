@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+planner.db
+planner.db-wal
+planner.db-shm
+.vercel/
+.DS_Store

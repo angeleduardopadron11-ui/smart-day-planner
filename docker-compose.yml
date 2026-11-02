@@ -1,0 +1,9 @@
+services:
+  smart-planner:
+    build: .
+    container_name: smart-planner
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./planner.db:/app/planner.db
+    restart: unless-stopped

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Day Planner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="/static/js/app.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .slide-up { animation: slideUp 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .timeline-line { position: absolute; left: 1.25rem; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, #e2e8f0, #cbd5e1); }
+    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(40%); }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="h-full bg-slate-50 font-sans" x-data x-init="$store.app.init()">
+
+  <!-- Toast notification -->
+  <div x-cloak x-show="$store.app.toast.show"
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0 translate-y-2"
+       x-transition:enter-end="opacity-1 translate-y-0"
+       x-transition:leave="transition ease-in duration-200"
+       x-transition:leave-start="opacity-1"
+       x-transition:leave-end="opacity-0"
+       class="fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium"
+       :class="$store.app.toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'">
+    <span x-text="$store.app.toast.message"></span>
+  </div>
+
+  <div class="min-h-full flex flex-col">
+
+    <!-- ── Header ──────────────────────────────────────── -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-lg">
+              📋
+            </div>
+            <div>
+              <h1 class="text-lg font-bold text-slate-800">Smart Day Planner</h1>
+              <p class="text-xs text-slate-400">Planificación inteligente de tu día</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="$store.app.toggleChat()"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                    :class="$store.app.chatOpen ? 'bg-indigo-600 text-white shadow-sm' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'"
+                    title="Asistente de planificación">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span>Asistente AI</span>
+            </button>
+            <button @click="$store.app.showPrefs = !$store.app.showPrefs"
+                    class="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-700"
+                    :class="$store.app.showPrefs && 'bg-indigo-50 text-indigo-600'"
+                    title="Preferencias">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6">
+
+      <!-- ── Preferences Panel ─────────────────────────── -->
+      <div x-cloak x-show="$store.app.showPrefs"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 -translate-y-2"
+           x-transition:enter-end="opacity-1 translate-y-0"
+           class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600">
+          <h2 class="text-white font-semibold flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+            Mis Preferencias
+          </h2>
+          <p class="text-indigo-100 text-sm mt-1">Configura tu día ideal y genera tu horario automáticamente</p>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
+            <!-- Time preferences -->
+            <div>
+              <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Despertar</label>
+              <input type="time" x-model="$store.app.preferences.wake_time"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Dormir</label>
+              <input type="time" x-model="$store.app.preferences.sleep_time"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Inicio trabajo</label>
+              <input type="time" x-model="$store.app.preferences.work_start"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Fin trabajo</label>
+              <input type="time" x-model="$store.app.preferences.work_end"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            </div>
+
+            <!-- Duration preferences -->
+            <div>
+              <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Desayuno (min)</label>
+              <input type="number" x-model.number="$store.app.preferences.breakfast_duration" min="15" max="120" step="5"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Almuerzo (min)</label>
+              <input type="number" x-model.number="$store.app.preferences.lunch_duration" min="15" max="120" step="5"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Cena (min)</label>
+              <input type="number" x-model.number="$store.app.preferences.dinner_duration" min="15" max="120" step="5"
+                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            </div>
+
+            <!-- Toggles -->
+            <div class="flex items-center gap-3 pt-2">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" x-model="$store.app.preferences.exercise_enabled" class="sr-only peer">
+                <div class="w-9 h-5 bg-slate-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+              <span class="text-sm text-slate-600">Ejercicio</span>
+              <input type="number" x-model.number="$store.app.preferences.exercise_duration" min="15" max="180" step="5"
+                     x-show="$store.app.preferences.exercise_enabled"
+                     class="w-20 px-2 py-1 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+              <span x-show="$store.app.preferences.exercise_enabled" class="text-xs text-slate-400">min</span>
+            </div>
+
+            <div class="flex items-center gap-3 pt-2">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" x-model="$store.app.preferences.study_enabled" class="sr-only peer">
+                <div class="w-9 h-5 bg-slate-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-500"></div>
+              </label>
+              <span class="text-sm text-slate-600">Estudio</span>
+              <input type="number" x-model.number="$store.app.preferences.study_duration" min="15" max="300" step="15"
+                     x-show="$store.app.preferences.study_enabled"
+                     class="w-20 px-2 py-1 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+              <span x-show="$store.app.preferences.study_enabled" class="text-xs text-slate-400">min</span>
+            </div>
+          </div>
+
+          <div class="mt-6 flex justify-end">
+            <button @click="$store.app.savePreferences()"
+                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+              Guardar preferencias
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Date Navigation + Actions ─────────────────── -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-2">
+          <button @click="$store.app.prevDay()"
+                  class="p-2 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all text-slate-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+          </button>
+          <div class="flex items-center gap-3">
+            <input type="date" x-model="$store.app.currentDate" @change="$store.app.loadSchedule()"
+                   class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            <span class="text-sm text-slate-500 hidden sm:inline" x-text="$store.app.formatDate($store.app.currentDate)"></span>
+            <button x-show="!$store.app.isToday()" @click="$store.app.changeDate(new Date().toISOString().split('T')[0])"
+                    class="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors font-medium">
+              Hoy
+            </button>
+          </div>
+          <button @click="$store.app.nextDay()"
+                  class="p-2 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all text-slate-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="$store.app.openAddModal()"
+                  class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-white hover:shadow-sm transition-all flex items-center gap-1.5"
+                  x-show="$store.app.hasBlocks">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+            Agregar
+          </button>
+          <button @click="$store.app.downloadPDF()"
+                  class="px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-white hover:shadow-sm transition-all flex items-center gap-1.5"
+                  x-show="$store.app.hasBlocks">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            PDF
+          </button>
+          <button @click="$store.app.generateSchedule()"
+                  class="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 transition-all shadow-sm hover:shadow flex items-center gap-1.5"
+                  :disabled="$store.app.loading">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <span x-text="$store.app.hasBlocks ? 'Regenerar' : 'Generar horario'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Loading ───────────────────────────────────── -->
+      <div x-show="$store.app.loading" class="flex justify-center py-20">
+        <div class="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+      </div>
+
+      <!-- ── Empty State ───────────────────────────────── -->
+      <div x-show="!$store.app.loading && !$store.app.hasBlocks" class="fade-in text-center py-20">
+        <div class="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center text-4xl mb-4">
+          🗓️
+        </div>
+        <h3 class="text-lg font-semibold text-slate-700 mb-2">No hay horario para este día</h3>
+        <p class="text-slate-400 text-sm mb-6 max-w-sm mx-auto">
+          Configura tus preferencias y genera tu planificación inteligente de 24 horas
+        </p>
+        <button @click="$store.app.showPrefs = true; $store.app.generateSchedule()"
+                class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg">
+          ✨ Generar mi horario
+        </button>
+      </div>
+
+      <!-- ── Schedule Timeline ─────────────────────────── -->
+      <div x-show="!$store.app.loading && $store.app.hasBlocks" class="space-y-2">
+        <!-- Category legend -->
+        <div class="flex flex-wrap gap-2 mb-4">
+          <template x-for="cat in ['work','meal','exercise','study','personal','free','routine','sleep']">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                  :class="$store.app.categoryColor(cat)">
+              <span class="w-2 h-2 rounded-full" :class="$store.app.categoryDot(cat)"></span>
+              <span x-text="$store.app.categoryLabel(cat)"></span>
+            </span>
+          </template>
+        </div>
+
+        <!-- Timeline blocks -->
+        <div class="relative pl-10">
+          <div class="timeline-line"></div>
+          <template x-for="(block, index) in $store.app.blocks" :key="block.id || index">
+            <div class="relative mb-2 slide-up" :style="`animation-delay: ${index * 30}ms`">
+              <!-- Time dot -->
+              <div class="absolute -left-10 mt-3 w-10 flex justify-center">
+                <div class="w-3 h-3 rounded-full border-2 border-white shadow-sm" :class="$store.app.categoryDot(block.category)"></div>
+              </div>
+
+              <!-- Block card -->
+              <div class="bg-white rounded-xl border p-4 hover:shadow-md transition-all cursor-pointer group"
+                   :class="$store.app.editingBlock && $store.app.editingBlock.id === block.id ? 'ring-2 ring-indigo-500 shadow-md' : 'border-slate-200 hover:border-slate-300'"
+                   @click="$store.app.editingBlock?.id !== block.id && $store.app.startEdit(block)">
+
+                <!-- View mode -->
+                <div x-show="!$store.app.editingBlock || $store.app.editingBlock.id !== block.id">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs font-mono text-slate-400" x-text="block.start_time + ' - ' + block.end_time"></span>
+                        <span class="text-xs px-1.5 py-0.5 rounded-full font-medium" :class="$store.app.categoryColor(block.category)" x-text="$store.app.categoryLabel(block.category)"></span>
+                        <span class="text-xs text-slate-300" x-text="$store.app.blockDuration(block)"></span>
+                      </div>
+                      <h3 class="font-medium text-slate-800 text-sm" x-text="block.title"></h3>
+                      <p class="text-xs text-slate-400 mt-0.5" x-show="block.description" x-text="block.description"></p>
+                    </div>
+                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                      <button @click.stop="$store.app.startEdit(block)"
+                              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </button>
+                      <button @click.stop="$store.app.deleteBlock(block.id)"
+                              class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Edit mode -->
+                <div x-show="$store.app.editingBlock && $store.app.editingBlock.id === block.id" @click.stop>
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                    <div>
+                      <label class="block text-xs text-slate-400 mb-1">Inicio</label>
+                      <input type="time" x-model="$store.app.editingBlock.start_time"
+                             class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slate-400 mb-1">Fin</label>
+                      <input type="time" x-model="$store.app.editingBlock.end_time"
+                             class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slate-400 mb-1">Título</label>
+                      <input type="text" x-model="$store.app.editingBlock.title"
+                             class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-slate-400 mb-1">Categoría</label>
+                      <select x-model="$store.app.editingBlock.category"
+                              class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                        <option value="work">Trabajo</option>
+                        <option value="meal">Comida</option>
+                        <option value="exercise">Ejercicio</option>
+                        <option value="study">Estudio</option>
+                        <option value="personal">Personal</option>
+                        <option value="free">Libre</option>
+                        <option value="routine">Rutina</option>
+                        <option value="sleep">Dormir</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label class="block text-xs text-slate-400 mb-1">Descripción</label>
+                    <input type="text" x-model="$store.app.editingBlock.description"
+                           class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                           placeholder="Descripción opcional..." />
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button @click.stop="$store.app.cancelEdit()"
+                            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+                      Cancelar
+                    </button>
+                    <button @click.stop="$store.app.saveEdit()"
+                            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- ── Saved Dates sidebar ───────────────────────── -->
+      <div x-show="$store.app.savedDates.length > 0 && $store.app.hasBlocks" class="mt-8 pt-6 border-t border-slate-200">
+        <h3 class="text-sm font-medium text-slate-500 mb-3">Horarios guardados</h3>
+        <div class="flex flex-wrap gap-2">
+          <template x-for="d in $store.app.savedDates" :key="d">
+            <button @click="$store.app.changeDate(d)"
+                    class="px-3 py-1.5 text-xs rounded-lg border transition-all"
+                    :class="d === $store.app.currentDate ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium' : 'border-slate-200 text-slate-500 hover:bg-white hover:shadow-sm'">
+              <span x-text="d"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </main>
+
+    <!-- ── Footer ──────────────────────────────────────── -->
+    <footer class="border-t border-slate-200 bg-white mt-auto">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-slate-400">
+        Smart Day Planner — Planificación inteligente de tu día
+      </div>
+    </footer>
+  </div>
+
+  <!-- ── Add Block Modal ───────────────────────────────── -->
+  <div x-cloak x-show="$store.app.showAddModal"
+       class="fixed inset-0 z-50 flex items-center justify-center p-4"
+       @keydown.escape.window="$store.app.showAddModal = false">
+    <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="$store.app.showAddModal = false"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6 fade-in"
+         @click.stop>
+      <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+        Agregar actividad
+      </h3>
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Inicio</label>
+            <input type="time" x-model="$store.app.newBlock.start_time"
+                   class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Fin</label>
+            <input type="time" x-model="$store.app.newBlock.end_time"
+                   class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1">Título</label>
+          <input type="text" x-model="$store.app.newBlock.title" placeholder="Nombre de la actividad"
+                 class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1">Categoría</label>
+          <select x-model="$store.app.newBlock.category"
+                  class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="work">Trabajo</option>
+            <option value="meal">Comida</option>
+            <option value="exercise">Ejercicio</option>
+            <option value="study">Estudio</option>
+            <option value="personal">Personal</option>
+            <option value="free">Libre</option>
+            <option value="routine">Rutina</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1">Descripción (opcional)</label>
+          <input type="text" x-model="$store.app.newBlock.description" placeholder="Detalles..."
+                 class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-6">
+        <button @click="$store.app.showAddModal = false"
+                class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+          Cancelar
+        </button>
+        <button @click="$store.app.addBlock()"
+                class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+          Agregar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Floating AI Agent Trigger Button ──────────────── -->
+  <div class="fixed bottom-6 right-6 z-40">
+    <button @click="$store.app.toggleChat()"
+            class="flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-full shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:-translate-y-0.5 group">
+      <span class="relative flex h-3 w-3">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-400"></span>
+      </span>
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+      </svg>
+      <span class="text-sm tracking-wide">Asistente AI</span>
+    </button>
+  </div>
+
+  <!-- ── AI Agent Chat Window ──────────────────────────── -->
+  <div x-cloak x-show="$store.app.chatOpen"
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0 translate-y-6 scale-95"
+       x-transition:enter-end="opacity-1 translate-y-0 scale-100"
+       x-transition:leave="transition ease-in duration-200"
+       x-transition:leave-start="opacity-1 translate-y-0 scale-100"
+       x-transition:leave-end="opacity-0 translate-y-6 scale-95"
+       class="fixed bottom-20 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[420px] h-[540px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+
+    <!-- Chat Header -->
+    <div class="px-4 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-lg">
+          🤖
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold leading-tight">Asistente de Horario</h3>
+          <p class="text-[11px] text-indigo-100 flex items-center gap-1.5 mt-0.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Listo para ayudarte</span>
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1">
+        <!-- Voice response toggle -->
+        <button @click="$store.app.toggleVoiceResponse()"
+                :title="$store.app.voiceResponseEnabled ? 'Voz del asistente activada (clic para silenciar)' : 'Voz del asistente silenciada (clic para activar)'"
+                class="p-1.5 text-indigo-100 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+          <svg x-show="$store.app.voiceResponseEnabled" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <svg x-show="!$store.app.voiceResponseEnabled" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        </button>
+        <button @click="$store.app.clearChat()"
+                title="Limpiar conversación"
+                class="p-1.5 text-indigo-100 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+        <button @click="$store.app.toggleChat()"
+                title="Cerrar chat"
+                class="p-1.5 text-indigo-100 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div id="chat-messages-container"
+         class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/70 text-sm">
+      <template x-for="msg in $store.app.messages" :key="msg.id">
+        <div class="flex flex-col"
+             :class="msg.sender === 'user' ? 'items-end' : 'items-start'">
+
+          <!-- Sender label & time -->
+          <div class="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1 px-1">
+            <span x-text="msg.sender === 'user' ? 'Tú' : 'Asistente'"></span>
+            <span x-show="msg.fromVoice" class="text-rose-500 font-semibold" title="Voz">🎙️</span>
+            <span>•</span>
+            <span x-text="msg.time"></span>
+            <button x-show="msg.sender === 'agent'"
+                    @click.stop="$store.app.speak(msg.text)"
+                    title="Escuchar mensaje"
+                    class="p-0.5 hover:text-indigo-600 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Bubble -->
+          <div class="max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm text-sm"
+               :class="msg.sender === 'user' 
+                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-none' 
+                 : (msg.error ? 'bg-red-50 text-red-800 border border-red-200 rounded-bl-none' : 'bg-white text-slate-700 border border-slate-200/80 rounded-bl-none')">
+            <div x-html="$store.app.formatMessage(msg.text)" class="leading-relaxed"></div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Agent typing indicator -->
+      <div x-show="$store.app.agentLoading" class="flex items-center gap-2 p-2 text-slate-400 text-xs">
+        <div class="w-2 h-2 rounded-full bg-indigo-500 animate-bounce"></div>
+        <div class="w-2 h-2 rounded-full bg-purple-500 animate-bounce [animation-delay:0.2s]"></div>
+        <div class="w-2 h-2 rounded-full bg-pink-500 animate-bounce [animation-delay:0.4s]"></div>
+        <span class="ml-1 text-[11px]">Planificando...</span>
+      </div>
+    </div>
+
+    <!-- Live listening banner -->
+    <div x-cloak x-show="$store.app.isListening"
+         x-transition
+         class="px-3 py-1.5 bg-rose-50 border-t border-rose-200 flex items-center justify-between text-xs text-rose-700 shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="relative flex h-2.5 w-2.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+        </span>
+        <span class="font-medium animate-pulse" x-text="'Grabando audio (' + $store.app.recordingSeconds + 's)... Clic en el micro para finalizar'"></span>
+      </div>
+      <button @click="$store.app.toggleVoiceInput()" class="text-[11px] underline font-semibold text-rose-800 hover:text-rose-950">
+        Enviar ahora
+      </button>
+    </div>
+
+    <!-- Quick action chips -->
+    <div class="px-3 py-2 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 text-xs">
+      <button @click="$store.app.quickSend('genera mi horario')"
+              class="whitespace-nowrap px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 transition-colors">
+        ✨ Generar horario
+      </button>
+      <button @click="$store.app.quickSend('agrega gimnasio de 7 a 8am')"
+              class="whitespace-nowrap px-2.5 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-100 transition-colors">
+        💪 Agrega gym 7-8
+      </button>
+      <button @click="$store.app.quickSend('¿qué tengo hoy?')"
+              class="whitespace-nowrap px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+        📋 ¿Qué tengo?
+      </button>
+      <button @click="$store.app.quickSend('descarga el horario en pdf')"
+              class="whitespace-nowrap px-2.5 py-1 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 transition-colors">
+        📥 Bajar PDF
+      </button>
+    </div>
+
+    <!-- Input bar -->
+    <div class="p-3 bg-white border-t border-slate-200 shrink-0">
+      <form @submit.prevent="$store.app.sendMessage()" class="flex items-center gap-2">
+        <!-- Microphone Button -->
+        <button type="button"
+                @click="$store.app.toggleVoiceInput()"
+                :title="$store.app.isListening ? 'Detener micrófono' : 'Hablar con el asistente por micrófono'"
+                class="p-2.5 rounded-xl border transition-all shrink-0 relative flex items-center justify-center"
+                :class="$store.app.isListening 
+                  ? 'bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-500/30 ring-4 ring-rose-100 animate-pulse' 
+                  : 'bg-slate-50 hover:bg-indigo-50 border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600'">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+        </button>
+
+        <!-- Text Input -->
+        <input id="agent-chat-input"
+               type="text"
+               x-model="$store.app.chatInput"
+               :placeholder="$store.app.isListening ? '🎙️ Escuchando... habla ahora...' : 'Escribe o usa el micrófono...'"
+               autocomplete="off"
+               class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all placeholder:text-slate-400" />
+
+        <!-- Send Button -->
+        <button type="submit"
+                :disabled="!$store.app.chatInput.trim() || $store.app.agentLoading"
+                class="p-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl shadow-sm transition-all shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </button>
+      </form>
+      <p class="text-[10px] text-slate-400 text-center mt-1.5 flex items-center justify-center gap-1">
+        <span>Presiona el micro 🎙️ para dictar o escribe comandos como</span>
+        <span class="font-medium text-slate-500">"agrega almuerzo de 13 a 14"</span>
+      </p>
+    </div>
+  </div>
+
+</body>
+</html>
